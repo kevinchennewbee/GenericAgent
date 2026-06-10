@@ -27,6 +27,11 @@ def venv_python():
 def has_systemd():
     return shutil.which("systemctl") is not None
 
+def ensure_upstream():
+    r = sh(["git", "remote"], cwd=ROOT)
+    if "upstream" not in (r.stdout or "").split():
+        sh(["git", "remote", "add", "upstream", "https://github.com/lsdefine/GenericAgent.git"], cwd=ROOT)
+
 # ---------- doctor ----------
 def doctor():
     print("🏮 蓬莱医生体检中...\n")
@@ -84,6 +89,7 @@ def doctor():
         print(f"{WARN} 非 systemd 环境（macOS/容器），跳过服务检查")
 
     # 7. 上游同步状态
+    ensure_upstream()
     r = sh(["git", "fetch", "upstream", "--quiet"], cwd=ROOT)
     if r.returncode == 0:
         r = sh(["git", "rev-list", "--count", "HEAD..upstream/main"], cwd=ROOT)
@@ -120,6 +126,7 @@ def logs():
 # ---------- update ----------
 def update():
     print("🔄 同步上游 GenericAgent ...")
+    ensure_upstream()
     if sh(["git", "fetch", "upstream"], cwd=ROOT).returncode != 0:
         print(f"{BAD} fetch 失败（检查网络）"); return 1
     r = sh(["git", "rev-list", "--count", "HEAD..upstream/main"], cwd=ROOT)

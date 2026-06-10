@@ -72,10 +72,10 @@ def step_llm():
     print("  连通性测试中...", end="", flush=True)
     try:
         r = post_json(base.rstrip("/") + "/chat/completions",
-                      {"model": model, "messages": [{"role": "user", "content": "回复两个字：蓬莱"}], "max_tokens": 16},
+                      {"model": model, "messages": [{"role": "user", "content": "回复两个字：蓬莱"}], "max_tokens": 64},
                       {"Authorization": f"Bearer {key}"})
         reply = r["choices"][0]["message"]["content"].strip()[:20]
-        print(f"\r{OK} 模型连通，回复：{reply}")
+        print(f"\r{OK} 模型连通" + (f"，回复：{reply}" if reply else "（思考型模型，空文本正常）"))
         return {"name": name, "apikey": key, "apibase": base, "model": model}
     except Exception as e:
         print(f"\r{BAD} 测试失败：{e}")
