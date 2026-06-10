@@ -41,6 +41,20 @@
 
 ## 🚀 快速开始
 
+新机器只要联网，**一行命令**——没有 Python、没有 git 都不要紧，脚本全自动备好：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/kevinchennewbee/PenglaiAgent/main/install.sh | sh
+```
+
+国内网络（走镜像，同样一行）：
+
+```bash
+curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/kevinchennewbee/PenglaiAgent/main/install.sh | sh
+```
+
+喜欢自己动手的，传统三段式同样可用：
+
 ```bash
 git clone https://github.com/kevinchennewbee/PenglaiAgent.git
 cd PenglaiAgent

@@ -42,6 +42,15 @@ One $5/month VPS, one LLM API key, a ten-minute wizard — and you have your own
 
 ## 🚀 Quick Start
 
+A fresh machine with nothing but an internet connection — **one command**. No Python, no git
+required; the script sets up everything automatically:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/kevinchennewbee/PenglaiAgent/main/install.sh | sh
+```
+
+Prefer doing it by hand? The classic way works too:
+
 ```bash
 git clone https://github.com/kevinchennewbee/PenglaiAgent.git
 cd PenglaiAgent
