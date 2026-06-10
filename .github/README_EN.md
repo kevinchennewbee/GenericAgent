@@ -29,7 +29,7 @@ One $5/month VPS, one LLM API key, a ten-minute wizard — and you have your own
 
 ## ✨ What it does
 
-- 🏮 **Ten-minute setup** — one wizard (`penglai setup`): auto-installs deps (China-mirror aware) → pick a model & test connectivity → guided Feishu credentials → name your butler → WeChat QR login
+- 🏮 **Ten-minute setup** — one wizard (`penglai setup`): auto-installs deps (China-mirror aware) → pick a model & test connectivity → **scan-to-create your Feishu bot** (no console clicking; manual credentials as fallback) → name your butler → WeChat QR login
 - 💬 **Feishu + WeChat, both native** — personal WeChat via QR login with text/voice/image in & out; Feishu over a long connection, no public IP needed
 - 🎙️ **Ears that hear emotion** — SenseVoice running locally on CPU (~230MB): transcription + emotion tags + acoustic events, arriving as `[voice (emotion: tired): such a long day]`
 - 🧠 **Four-tier memory** — index / facts / skills / raw sessions as plain auditable markdown; every write passes a threat scan (prompt injection / role hijack / secret leakage), overwrites forbidden

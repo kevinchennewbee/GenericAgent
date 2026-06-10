@@ -46,11 +46,11 @@ def step_env():
         try:
             if uv:
                 subprocess.run([uv, "venv", ".venv"], cwd=ROOT, check=True, env={**os.environ, "UV_DEFAULT_INDEX": idx})
-                subprocess.run([uv, "pip", "install", "--python", py, "-q", "-e", ".", "lark-oapi"], cwd=ROOT, check=True,
+                subprocess.run([uv, "pip", "install", "--python", py, "-q", "-e", ".", "lark-oapi", "qrcode"], cwd=ROOT, check=True,
                                env={**os.environ, "UV_DEFAULT_INDEX": idx})
             else:
                 subprocess.run([sys.executable, "-m", "venv", ".venv"], cwd=ROOT, check=True)
-                subprocess.run([py, "-m", "pip", "install", "-q", "-i", idx, "-e", ".", "lark-oapi"], cwd=ROOT, check=True)
+                subprocess.run([py, "-m", "pip", "install", "-q", "-i", idx, "-e", ".", "lark-oapi", "qrcode"], cwd=ROOT, check=True)
             print(f"{OK} 依赖安装完成")
         except subprocess.CalledProcessError:
             print(f"{BAD} 依赖安装失败，请手动执行后重试: python3 -m venv .venv && .venv/bin/pip install -e . lark-oapi")
@@ -83,9 +83,89 @@ def step_llm():
         sys.exit(1)
 
 # ---------- 步骤 2：飞书 ----------
+_FS_REG = "https://accounts.feishu.cn/oauth/v1/app/registration"
+
+def _post_form(url, body, timeout=10):
+    """表单 POST。注册端点 4xx 也带 JSON（poll 的 authorization_pending 走 400），照常解析。"""
+    import urllib.error, urllib.parse
+    req = urllib.request.Request(url, data=urllib.parse.urlencode(body).encode(),
+                                 headers={"Content-Type": "application/x-www-form-urlencoded"})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return json.loads(r.read().decode())
+    except urllib.error.HTTPError as e:
+        raw = e.read()
+        if raw:
+            try: return json.loads(raw.decode())
+            except ValueError: raise
+        raise
+
+def _render_qr(url):
+    """终端渲染二维码。当前解释器没有 qrcode 就借 venv 的（step_env 已装入）。"""
+    code = ("import qrcode\nq=qrcode.QRCode(); q.add_data(%r); q.make(fit=True); "
+            "q.print_ascii(invert=True)" % url)
+    for py in (sys.executable, os.path.join(ROOT, ".venv", "bin", "python")):
+        if os.path.exists(py) and subprocess.run([py, "-c", code]).returncode == 0:
+            return True
+    return False
+
+def _feishu_qr_create():
+    """扫码自动建应用：飞书官方设备码注册流（accounts.feishu.cn）。
+    begin 拿二维码 → 手机飞书扫码确认 → 平台自动创建配好权限的机器人应用 → poll 返回凭证。
+    成功返回 (app_id, app_secret)，失败返回 None（外层回落手动）。"""
+    init = _post_form(_FS_REG, {"action": "init"})
+    if "client_secret" not in (init.get("supported_auth_methods") or []):
+        return None
+    begin = _post_form(_FS_REG, {"action": "begin", "archetype": "PersonalAgent",
+                                 "auth_method": "client_secret", "request_user_info": "open_id"})
+    device = begin.get("device_code")
+    if not device:
+        return None
+    qr_url = begin.get("verification_uri_complete", "")
+    shown = _render_qr(qr_url)
+    print(f"  📱 打开手机飞书「扫一扫」，{'扫上方二维码' if shown else '扫码入口见下方链接（电脑浏览器打开后出码）'}，确认创建机器人应用")
+    print(f"  {qr_url}\n  等待确认", end="", flush=True)
+    deadline = time.monotonic() + min(int(begin.get("expires_in") or 600), 600)
+    interval = max(int(begin.get("interval") or 5), 2)
+    while time.monotonic() < deadline:
+        try:
+            res = _post_form(_FS_REG, {"action": "poll", "device_code": device, "tp": "ob_app"})
+        except Exception:
+            time.sleep(interval); continue
+        if res.get("client_id") and res.get("client_secret"):
+            print()
+            return res["client_id"], res["client_secret"]
+        if res.get("error") in ("access_denied", "expired_token"):
+            print(f"\n  {BAD} " + ("已在手机上取消" if res["error"] == "access_denied" else "二维码已过期"))
+            return None
+        print(".", end="", flush=True)
+        time.sleep(interval)
+    print(f"\n  {BAD} 等待扫码超时")
+    return None
+
+def _feishu_verify(app_id, app_secret):
+    r = post_json("https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal",
+                  {"app_id": app_id, "app_secret": app_secret})
+    return r.get("code") == 0, r.get("msg")
+
 def step_feishu():
-    print(f"\n{T} 步骤 2/5 接入飞书（约 3 分钟，跟着做）")
-    print("""  ① 浏览器打开 https://open.feishu.cn/app → 创建企业自建应用（名字随意，如「蓬莱」）
+    print(f"\n{T} 步骤 2/5 接入飞书")
+    print("  1. 手机飞书扫码，自动创建机器人应用（推荐，免开网页）")
+    print("  2. 手动填入已有的 App ID / App Secret")
+    if ask("选择方式", "1") == "1":
+        try:
+            cred = _feishu_qr_create()
+        except Exception as e:
+            print(f"  {BAD} 扫码流程异常：{e}"); cred = None
+        if cred:
+            app_id, app_secret = cred
+            print("  凭证验证中...", end="", flush=True)
+            ok, msg = _feishu_verify(app_id, app_secret)
+            if ok:
+                print(f"\r{OK} 应用已创建，凭证有效（App ID: {app_id}）"); return app_id, app_secret
+            print(f"\r{BAD} 自动创建的凭证验证失败：{msg}")
+        print("  ↓ 回落手动方式")
+        print("""  ① 浏览器打开 https://open.feishu.cn/app → 创建企业自建应用（名字随意，如「蓬莱」）
   ② 左栏「添加应用能力」→ 添加「机器人」
   ③ 左栏「权限管理」→ 搜索并开通: im:message（获取与发送单聊/群聊消息相关权限，批量勾选）
   ④ 左栏「事件订阅」→ 订阅方式选「使用长连接接收事件」→ 添加事件: 接收消息 im.message.receive_v1
@@ -96,11 +176,10 @@ def step_feishu():
         app_secret = ask("App Secret")
         print("  凭证验证中...", end="", flush=True)
         try:
-            r = post_json("https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal",
-                          {"app_id": app_id, "app_secret": app_secret})
-            if r.get("code") == 0:
+            ok, msg = _feishu_verify(app_id, app_secret)
+            if ok:
                 print(f"\r{OK} 飞书凭证有效"); return app_id, app_secret
-            print(f"\r{BAD} 飞书返回错误：{r.get('msg')}（检查是否复制完整）")
+            print(f"\r{BAD} 飞书返回错误：{msg}（检查是否复制完整）")
         except Exception as e:
             print(f"\r{BAD} 验证失败：{e}")
 
