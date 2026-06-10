@@ -64,6 +64,21 @@ def doctor():
     check("飞书 SDK (lark-oapi)", r.returncode == 0,
           "运行: uv pip install --python .venv/bin/python lark-oapi")
 
+    # 2b. 微信绑定（可选渠道，未绑定≠故障）
+    tok = os.path.expanduser("~/.wxbot/token.json")
+    if os.path.exists(tok):
+        try:
+            import json
+            bid = json.load(open(tok, encoding="utf-8")).get("ilink_bot_id", "")
+            print(f"{OK} 微信绑定：{bid or '已有 token'}")
+        except Exception:
+            print(f"{WARN} 微信 token 文件损坏 → 重跑 penglai setup 扫码")
+        if has_systemd() and sh(["systemctl", "show", "penglai-wechat",
+                                 "-p", "ExecMainStatus", "--value"]).stdout.strip() == "2":
+            print(f"{WARN} 微信 token 已过期 → penglai setup 重新扫码后 sudo systemctl restart penglai-wechat")
+    else:
+        print(f"{OK} 微信：未绑定（可选渠道，penglai setup 可扫码接入）")
+
     # 3. 配置
     mykey = os.path.join(ROOT, "mykey.py")
     if os.path.exists(mykey):
