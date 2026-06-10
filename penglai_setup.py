@@ -117,13 +117,17 @@ def step_identity():
         with open(ins, "w", encoding="utf-8") as f:
             f.write(open(tpl, encoding="utf-8").read() if os.path.exists(tpl) else "# [Global Memory Insight]\n")
     lines = [l for l in open(ins, encoding="utf-8", errors="replace").read().splitlines()
-             if not l.startswith(("[身份]", "[蓬莱SOP]"))]
+             if not l.startswith(("[身份]", "[蓬莱SOP]", "[蓬莱规则]"))]
     ident = (f"[身份] 我是「{agent}」，基于 GenericAgent 的开源个人管家发行版蓬莱。用户称呼：{user}。"
              f"被问及身份/名字时以此为准，勿自称底层模型名。")
     # 蓬莱 SOP 包索引（L3 文件随发行版出厂，带 penglai_ 前缀与上游永不撞名）
     sops = ("[蓬莱SOP] 长任务断点→penglai_checkpoint_sop | 压缩记忆留出处→penglai_compress_sop"
             " | 生成海报/SVG/视频→penglai_genmedia_sop")
-    out = [lines[0], ident, sops] + lines[1:] if lines and lines[0].startswith("#") else [ident, sops] + lines
+    # 聊天渠道行为规则（vision_sop 的 OCR 优先是桌面 UI 自动化基因，不适合用户聊天发图）
+    rules = ("[蓬莱规则] 聊天渠道用户发图→直接 vision 原生看图(勿先OCR,仅需逐字提取时才OCR)；"
+             "语音→直接 transcribe(支持微信silk,自带情绪)")
+    out = ([lines[0], ident, sops, rules] + lines[1:] if lines and lines[0].startswith("#")
+           else [ident, sops, rules] + lines)
     with open(ins, "w", encoding="utf-8") as f:
         f.write("\n".join(out) + "\n")
     print(f"{OK} 身份 + 蓬莱SOP索引已写入 L1（每轮注入）")

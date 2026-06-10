@@ -37,16 +37,38 @@ def _get_recognizer():
             use_itn=True, language="auto", num_threads=2)
     return _recognizer
 
+_SILK_MAGIC = (b"#!SILK_V3", b"\x02#!SILK_V3")  # 标准 / 腾讯变体（前缀 0x02）
+
+def _is_silk(path):
+    try:
+        with open(path, "rb") as f: return f.read(10).startswith(_SILK_MAGIC)
+    except OSError:
+        return False
+
 def transcribe_file(path):
-    """音频文件 → {text, emotion, event, lang}。ffmpeg 解码，支持 opus/mp3/wav/m4a/amr 等。"""
+    """音频文件 → {text, emotion, event, lang}。ffmpeg 解码（opus/mp3/wav/m4a/amr 等）；
+    微信 .silk 先用 pilk 解成 PCM 再走同一管线（ffmpeg 不认 silk）。"""
     if not os.path.isfile(os.path.join(MODEL_DIR, "model.int8.onnx")):
         return {"error": _DOWNLOAD_HINT}
-    p = subprocess.run(["ffmpeg", "-v", "error", "-i", path, "-f", "f32le", "-ac", "1", "-ar", "16000", "-"],
+    in_args, pcm_tmp = ["-i", path], None
+    if _is_silk(path) or path.endswith(".silk"):
+        try:
+            import pilk
+        except ImportError:
+            return {"error": "微信 silk 语音需要 pilk 解码库，请安装: uv pip install pilk"}
+        pcm_tmp = path + ".pcm"
+        try:
+            pilk.decode(path, pcm_tmp, pcm_rate=24000)
+        except Exception as e:
+            return {"error": f"silk 解码失败: {e}"}
+        in_args = ["-f", "s16le", "-ar", "24000", "-ac", "1", "-i", pcm_tmp]
+    p = subprocess.run(["ffmpeg", "-v", "error"] + in_args + ["-f", "f32le", "-ac", "1", "-ar", "16000", "-"],
                        capture_output=True)
+    if pcm_tmp and os.path.exists(pcm_tmp):
+        try: os.remove(pcm_tmp)
+        except OSError: pass
     if p.returncode != 0:
         err = p.stderr.decode(errors="replace")[:200]
-        if path.endswith(".silk"):
-            err += "（微信 silk 格式需先转码，ffmpeg 不支持）"
         return {"error": f"音频解码失败: {err}"}
     samples = array.array("f")
     samples.frombytes(p.stdout)
@@ -87,7 +109,7 @@ _SCHEMA = {"type": "function", "function": {
     "description": "语音转文字并识别说话语气情绪/声学事件（本地 SenseVoice 模型，中英日韩粤）。"
                    "用户消息中出现 [audio: ...] 或提供音频文件路径时，先调用本工具再回应。",
     "parameters": {"type": "object", "properties": {
-        "path": {"type": "string", "description": "音频文件路径（opus/mp3/wav/m4a/amr 等）"}},
+        "path": {"type": "string", "description": "音频文件路径（opus/mp3/wav/m4a/amr/微信silk 等，silk 自动解码无需预处理）"}},
         "required": ["path"]}}}
 
 @register("agent_before")
