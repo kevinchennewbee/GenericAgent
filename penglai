@@ -78,6 +78,12 @@ def doctor():
     else:
         print(f"{OK} 记忆 L2：尚未初始化（首次运行自动创建）")
 
+    # 5b. 情报矩阵（可选增强）
+    r = sh([py, "-c", "import sys;sys.path.insert(0,'.');from plugins.penglai_search import enabled_sources;"
+            "print(','.join(enabled_sources()))"], cwd=ROOT)
+    srcs = (r.stdout or "").strip()
+    print(f"{OK} 情报矩阵：{'已启用 ' + srcs if srcs else '默认（GA 浏览器，未配 API key）'}")
+
     # 6. 服务
     if has_systemd():
         for s in SERVICES:

@@ -127,7 +127,22 @@ def step_identity():
     return agent
 
 # ---------- 步骤 4：写配置 ----------
-def step_write(llm, app_id, app_secret):
+def step_intel():
+    """可选增强：情报矩阵（默认跳过=用 GA 原生浏览器）。"""
+    print(f"\n{T} 可选增强 · 情报矩阵（多源交叉验证，降低幻觉）")
+    print("  默认不开 → 蓬莱用 GA 自带的真浏览器搜索（免费、开箱即用，已够用）。")
+    print("  开启后 → 多个独立搜索 API 并查 + 交叉验证，更适合事实核查/写记忆/做决策。")
+    if not ask("现在开启情报矩阵增强？(y/n)", "n").lower().startswith("y"):
+        return {}
+    print("  推荐 TinyFish（免费、自有索引）：到 https://agent.tinyfish.ai/api-keys 申请，回车跳过")
+    keys = {}
+    if k := ask("TinyFish API Key（X-API-Key，可空）"): keys["tinyfish_key"] = k
+    if k := ask("Tavily API Key（免费额度，可空）"):    keys["tavily_key"] = k
+    if k := ask("Firecrawl API Key（可空）"):           keys["firecrawl_key"] = k
+    print(f"{OK} 情报矩阵：{len(keys)} 个源已配置" if keys else "  未填 key，保持默认（GA 浏览器）")
+    return keys
+
+def step_write(llm, app_id, app_secret, intel=None):
     print(f"\n{T} 步骤 4/5 写入配置 mykey.py")
     path = os.path.join(ROOT, "mykey.py")
     if os.path.exists(path):
@@ -150,6 +165,8 @@ fs_app_id = {app_id!r}
 fs_app_secret = {app_secret!r}
 fs_allowed_users = []   # 留空=所有人可用；建议测试后填入自己的 open_id 收紧权限
 """
+    for k, v in (intel or {}).items():
+        body += f"{k} = {v!r}\n"
     with open(path, "w", encoding="utf-8") as f: f.write(body)
     os.chmod(path, 0o600)
     print(f"{OK} 配置完成（权限 600，已加入 .gitignore 范围）")
@@ -186,7 +203,8 @@ def main():
     llm = step_llm()
     app_id, app_secret = step_feishu()
     agent = step_identity()
-    step_write(llm, app_id, app_secret)
+    intel = step_intel()
+    step_write(llm, app_id, app_secret, intel)
     step_launch()
     print(f"\n🎉 安装完成！现在去飞书找到你的应用，给「{agent}」发一句：你好")
     print("   体检: ./penglai doctor   日志: ./penglai logs   同步上游: ./penglai update")

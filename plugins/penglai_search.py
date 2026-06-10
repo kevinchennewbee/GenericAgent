@@ -1,147 +1,128 @@
 # -*- coding: utf-8 -*-
-"""蓬莱插件：求证型多源搜索（情报矩阵 M5 — 多源不为省钱，为求真）。
+"""蓬莱可选增强：情报矩阵（M5 — 多源不为省钱，为求真）。
 
-无 key 基线（国内可用）：Bing + 搜狗 两个独立引擎并查。
-可选增强：mykey.py 配 tavily_key / firecrawl_key 时自动并入为第三源。
-做法：并查 → 按域名去重 → 标注每条来源 → 多源都出现的结果标 ★（高置信）。
-交叉验证由 agent 完成（schema 描述里指示），工具只负责把多源证据清晰摆出来。
+设计原则（默认即 GA 原版）：
+- 不配任何 key → 本工具【不挂载】，agent 用 GA 原生真浏览器 web_scan/web_execute_js（免费、开箱即用）。
+- 安装时勾选"增强情报矩阵"并填 key → 本工具挂载，多个独立 API 源并查 + 交叉验证。
+  全部是干净结构化 API（非 HTML 抓取）：返回真实 URL，按域名去重，多源收敛标 ★。
 
-挂载：类注入 do_web_search + agent_before 注入 schema。GA 内核零改动。
-GA 自带的 web_scan/web_execute_js（真浏览器）保留不动，本工具是其无浏览器补充。
+支持的源（任配其一即启用，免费优先）：
+- TinyFish Search（免费、自有索引、X-API-Key）  mykey: tinyfish_key
+- Tavily（免费额度）                            mykey: tavily_key
+- Firecrawl（/v1/search）                       mykey: firecrawl_key
+
+挂载：类注入 do_web_search + agent_before 注入 schema（仅当至少一个 key 存在）。GA 内核零改动。
 """
-import os, re, json, html
-from urllib.parse import urlparse, parse_qs, unquote
+import re
+from urllib.parse import urlparse
 
 from plugins.hooks import register
 from agent_loop import StepOutcome
 from ga import GenericAgentHandler
 
-_UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-       "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8"}
+
+def _mykey(name):
+    try:
+        import mykey
+        return (getattr(mykey, name, "") or "").strip()
+    except Exception:
+        return ""
 
 def _clean(t):
-    return re.sub(r"\s+", " ", html.unescape(t or "")).strip()
+    return re.sub(r"\s+", " ", str(t or "")).strip()
 
 def _domain(u):
     try: return urlparse(u).netloc.replace("www.", "")
     except Exception: return ""
 
-def _tokens(t):
-    return set(re.findall(r"[\w一-鿿]+", (t or "").lower())) - {"的", "and", "the", "·", "-"}
+def enabled_sources():
+    """返回已配置 key 的源名列表；空=未启用增强（agent 走 GA 浏览器）。"""
+    s = []
+    if _mykey("tinyfish_key"): s.append("TinyFish")
+    if _mykey("tavily_key"): s.append("Tavily")
+    if _mykey("firecrawl_key"): s.append("Firecrawl")
+    return s
 
-def _title_sig(t):
-    return "|".join(sorted(_tokens(t)))[:80]
-
-def _title_overlap(a, b):
-    ta, tb = _tokens(a), _tokens(b)
-    if not ta or not tb: return 0.0
-    return len(ta & tb) / min(len(ta), len(tb))
-
-def _bing(query, n=8):
+# ---- 各源适配（统一返回 [{title,url,snippet,source}]）----
+def _tinyfish(query, n):
     import requests
-    from bs4 import BeautifulSoup
-    r = requests.get("https://cn.bing.com/search", params={"q": query}, headers=_UA, timeout=10)
-    soup = BeautifulSoup(r.text, "html.parser")
-    out = []
-    for li in soup.select("li.b_algo")[:n]:
-        h = li.find("h2"); a = h.find("a") if h else None
-        if not a or not a.get("href"): continue
-        cap = li.select_one(".b_caption p, p")
-        out.append({"title": _clean(a.get_text()), "url": a["href"],
-                    "snippet": _clean(cap.get_text() if cap else ""), "source": "Bing"})
-    return out
-
-def _sogou(query, n=8):
-    import requests
-    from bs4 import BeautifulSoup
-    r = requests.get("https://www.sogou.com/web", params={"query": query}, headers=_UA, timeout=10)
-    soup = BeautifulSoup(r.text, "html.parser")
-    out = []
-    for h in soup.select("div.vrwrap h3, div.rb h3")[:n]:  # 真结果在 h3，跳过提示框
-        a = h.find("a")
-        if not a or not a.get("href"): continue
-        url = a["href"]
-        if url.startswith("/link"): url = "https://www.sogou.com" + url
-        wrap = h.find_parent(class_=re.compile("vrwrap|rb"))
-        sn = wrap.select_one(".star-wiki, .fz-mid, .text-layout, .space-txt, p") if wrap else None
-        title = _clean(a.get_text())
-        if title:
-            out.append({"title": title, "url": url, "snippet": _clean(sn.get_text() if sn else ""), "source": "搜狗"})
-    return out
-
-def _tavily(query, n=8):
-    import requests
-    key = _mykey_get("tavily_key")
-    if not key: return []
-    r = requests.post("https://api.tavily.com/search",
-                      json={"api_key": key, "query": query, "max_results": n}, timeout=15)
+    r = requests.get("https://api.search.tinyfish.ai",
+                     params={"query": query}, headers={"X-API-Key": _mykey("tinyfish_key")}, timeout=15)
     return [{"title": _clean(x.get("title")), "url": x.get("url"),
-             "snippet": _clean(x.get("content")), "source": "Tavily"} for x in r.json().get("results", [])]
+             "snippet": _clean(x.get("snippet")), "source": "TinyFish"}
+            for x in r.json().get("results", [])[:n]]
 
-def _mykey_get(name):
-    try:
-        import mykey
-        return getattr(mykey, name, "") or ""
-    except Exception:
-        return ""
+def _tavily(query, n):
+    import requests
+    r = requests.post("https://api.tavily.com/search",
+                      json={"api_key": _mykey("tavily_key"), "query": query, "max_results": n}, timeout=15)
+    return [{"title": _clean(x.get("title")), "url": x.get("url"),
+             "snippet": _clean(x.get("content")), "source": "Tavily"}
+            for x in r.json().get("results", [])[:n]]
+
+def _firecrawl(query, n):
+    import requests
+    r = requests.post("https://api.firecrawl.dev/v1/search",
+                      json={"query": query, "limit": n},
+                      headers={"Authorization": f"Bearer {_mykey('firecrawl_key')}"}, timeout=20)
+    return [{"title": _clean(x.get("title")), "url": x.get("url"),
+             "snippet": _clean(x.get("description")), "source": "Firecrawl"}
+            for x in r.json().get("data", [])[:n]]
+
+_ADAPTERS = {"TinyFish": _tinyfish, "Tavily": _tavily, "Firecrawl": _firecrawl}
 
 def search(query, n=8):
-    """并查多源 → 去重 → 标注收敛度。返回结构化 dict。"""
-    sources, errors = [], []
-    for fn in (_bing, _sogou, _tavily):
+    srcs = enabled_sources()
+    if not srcs:
+        return {"error": "情报矩阵未启用（未配置搜索 API key）。请用 GA 原生浏览器搜索，"
+                         "或运行 penglai setup 勾选增强情报矩阵。"}
+    results, errors = [], []
+    for name in srcs:
         try:
-            res = fn(query, n)
-            if res: sources.append(res)
+            res = _ADAPTERS[name](query, n)
+            if res: results.append(res)
         except Exception as e:
-            errors.append(f"{fn.__name__}: {type(e).__name__}")
-    if not sources:
-        return {"error": "所有搜索源均不可用: " + "; ".join(errors)}
-    # 归并：优先真实域名，跳转链接(/link)则按标题指纹。收敛=同一条出现在多个源。
+            errors.append(f"{name}({type(e).__name__})")
+    if not results:
+        return {"error": "所有已配置的搜索源均失败: " + "; ".join(errors)}
+    # 按真实域名归并，多源收敛=高可信
     merged = {}
-    for res in sources:
-        for item in res:
-            d = _domain(item["url"])
-            key = d if (d and "sogou.com" not in d and "so.com" not in d) else _title_sig(item["title"])
+    for res in results:
+        for it in res:
+            if not it["url"]: continue
+            key = _domain(it["url"]) or it["url"]
             if key not in merged:
-                merged[key] = {**item, "seen_in": {item["source"]}}
+                merged[key] = {**it, "seen_in": {it["source"]}}
             else:
-                merged[key]["seen_in"].add(item["source"])
-                if len(item["snippet"]) > len(merged[key]["snippet"]):
-                    merged[key]["snippet"] = item["snippet"]
-                if _domain(merged[key]["url"]) == "" or "/link" in merged[key]["url"]:
-                    if item["url"] and "/link" not in item["url"]: merged[key]["url"] = item["url"]
-    # 跨源标题相似的也判收敛（不同引擎跳转链接不同，靠标题对齐）
-    vals = list(merged.values())
-    for i, a in enumerate(vals):
-        for b in vals[i + 1:]:
-            if a["seen_in"] != b["seen_in"] and _title_overlap(a["title"], b["title"]) >= 0.5:
-                a["seen_in"] = b["seen_in"] = a["seen_in"] | b["seen_in"]
-    items = sorted(vals, key=lambda x: (-len(x["seen_in"]), len(x["title"])))
-    return {"query": query, "sources_used": len(sources), "errors": errors,
+                merged[key]["seen_in"].add(it["source"])
+                if len(it["snippet"]) > len(merged[key]["snippet"]):
+                    merged[key]["snippet"] = it["snippet"]
+    items = sorted(merged.values(), key=lambda x: (-len(x["seen_in"]), -len(x["snippet"])))
+    return {"query": query, "sources_used": len(results), "errors": errors,
             "results": [{"title": x["title"], "url": x["url"], "snippet": x["snippet"][:300],
                          "from": "+".join(sorted(x["seen_in"])),
                          "convergent": len(x["seen_in"]) > 1} for x in items[:10]]}
 
 def _format(r):
     if "error" in r: return r["error"]
-    lines = [f"多源搜索「{r['query']}」（{r['sources_used']} 个源" +
-             (f"，{','.join(r['errors'])}不可用" if r["errors"] else "") + "）："]
+    head = f"情报矩阵「{r['query']}」（{r['sources_used']} 源" + \
+           (f"，{','.join(r['errors'])}失败" if r["errors"] else "") + "）："
+    lines = [head]
     for i, x in enumerate(r["results"], 1):
         mark = "★" if x["convergent"] else " "
         lines.append(f"{mark}{i}. [{x['from']}] {x['title']}\n   {x['url']}\n   {x['snippet']}")
-    lines.append("\n[★=多源收敛，可信度较高]。求证型问题：对照不同来源，发现分歧要明示并说明依据，"
-                 "勿只取单一来源下结论。需要正文细节时再用 web_fetch/浏览器打开具体链接。")
+    if r["sources_used"] > 1:
+        lines.append("\n[★=多源收敛，可信度较高]。对照各源，发现分歧要明示并说明依据，勿只取单一来源下结论。")
     return "\n".join(lines)
 
 def do_web_search(self, args, response):
-    """求证型多源搜索：Bing+搜狗(+Tavily) 并查、交叉验证。"""
-    query = str(args.get("query", "")).strip()
+    """情报矩阵：多 API 源并查 + 交叉验证。"""
+    query = _clean(args.get("query", ""))
     if not query:
         return StepOutcome("[Error] query 不能为空",
                            next_prompt=self._get_anchor_prompt(skip=args.get("_index", 0) > 0))
-    yield f"\n[Action] 多源搜索: {query}\n"
-    r = search(query, n=int(args.get("n", 8)))
-    out = _format(r)
+    yield f"\n[Action] 情报矩阵检索: {query}\n"
+    out = _format(search(query, n=int(args.get("n", 8))))
     yield out[:500] + ("...\n" if len(out) > 500 else "\n")
     return StepOutcome(out, next_prompt=self._get_anchor_prompt(skip=args.get("_index", 0) > 0))
 
@@ -149,10 +130,9 @@ GenericAgentHandler.do_web_search = do_web_search
 
 _SCHEMA = {"type": "function", "function": {
     "name": "web_search",
-    "description": "求证型多源搜索：同时查 Bing+搜狗（国内可用，无需配置）等多个独立搜索引擎，"
-                   "按来源去重并标注收敛度（★=多源都出现=可信度高）。"
-                   "适用于事实核查、要写入记忆/做决策的查证场景——比单一搜索源更能发现分歧、降低幻觉。"
-                   "返回标题/链接/摘要列表；需要网页正文细节时再用浏览器或 web_fetch 打开具体链接。",
+    "description": "情报矩阵：同时查多个独立搜索 API（TinyFish/Tavily 等）并交叉验证，按来源去重、"
+                   "多源收敛标 ★（可信度高）。适用于事实核查、要写入记忆/做决策的查证场景——"
+                   "比单一来源更能发现分歧、降低幻觉。需要网页正文细节时再用浏览器打开具体链接。",
     "parameters": {"type": "object", "properties": {
         "query": {"type": "string", "description": "搜索查询词"},
         "n": {"type": "integer", "description": "每源结果数，默认 8"}},
@@ -160,6 +140,9 @@ _SCHEMA = {"type": "function", "function": {
 
 @register("agent_before")
 def _inject_search_schema(ctx):
+    # 仅当启用了情报矩阵（配了 key）才挂载；否则 agent 用 GA 原生浏览器
+    if not enabled_sources():
+        return
     ts = ctx.get("tools_schema")
     if isinstance(ts, list) and not any(
             t.get("function", {}).get("name") == "web_search" for t in ts if isinstance(t, dict)):
