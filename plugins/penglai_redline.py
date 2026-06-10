@@ -14,7 +14,7 @@ from ga import GenericAgentHandler
 
 _CMD = r"(^|[;&|`]\s*|\bsudo\s+)"  # 命令起始位置，降低误杀（如 echo "reboot guide" 不拦）
 RED_CODE = [
-    (r"rm\s+(-[a-zA-Z]+\s+)*(-[a-zA-Z]*[rf][a-zA-Z]*\s+)+(/|\$HOME|~)(\s*$|/?\*|\s)", "递归删除根/家目录"),
+    (r"rm\s+(-[a-zA-Z]+\s+)*(-[a-zA-Z]*[rf][a-zA-Z]*\s+)+(/|\$HOME|~)/?(\s*$|\*)", "递归删除根/家目录"),
     (_CMD + r"mkfs\b|\bdd\b[^|\n]*\bof=/dev/|>\s*/dev/(sd|nvme|vd)", "磁盘破坏操作"),
     (_CMD + r"(shutdown|reboot|halt|poweroff)\b", "关机/重启服务器"),
     (r":\(\)\s*\{[^}]*\|[^}]*&[^}]*\}", "fork 炸弹"),
