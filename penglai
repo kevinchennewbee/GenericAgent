@@ -69,7 +69,7 @@ def doctor():
     mem = os.path.join(ROOT, "memory", "global_mem.txt")
     if os.path.exists(mem):
         n = sum(1 for _ in open(mem, encoding="utf-8", errors="replace"))
-        print(f"{OK} 记忆 L2：{n} 行（{'出厂态' if n <= 3 else '使用中'}）")
+        print(f"{OK} 记忆 L2：{n} 行（{'出厂态' if n <= 6 else '使用中'}）")
     else:
         print(f"{OK} 记忆 L2：尚未初始化（首次运行自动创建）")
 
@@ -135,9 +135,7 @@ def update():
     return 0
 
 def setup():
-    print("🏮 蓬莱安装向导开发中（P1）。当前请使用 GA 配置器：")
-    print(f"   {venv_python()} {os.path.join(ROOT, 'assets', 'configure_mykey.py')}")
-    return 0
+    return subprocess.run([sys.executable, os.path.join(ROOT, "penglai_setup.py")]).returncode
 
 def main():
     cmds = {"doctor": doctor, "status": lambda: svc("status"), "start": lambda: svc("start"),
