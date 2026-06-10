@@ -117,13 +117,16 @@ def step_identity():
         with open(ins, "w", encoding="utf-8") as f:
             f.write(open(tpl, encoding="utf-8").read() if os.path.exists(tpl) else "# [Global Memory Insight]\n")
     lines = [l for l in open(ins, encoding="utf-8", errors="replace").read().splitlines()
-             if not l.startswith("[身份]")]
+             if not l.startswith(("[身份]", "[蓬莱SOP]"))]
     ident = (f"[身份] 我是「{agent}」，基于 GenericAgent 的开源个人管家发行版蓬莱。用户称呼：{user}。"
              f"被问及身份/名字时以此为准，勿自称底层模型名。")
-    out = [lines[0], ident] + lines[1:] if lines and lines[0].startswith("#") else [ident] + lines
+    # 蓬莱 SOP 包索引（L3 文件随发行版出厂，带 penglai_ 前缀与上游永不撞名）
+    sops = ("[蓬莱SOP] 长任务断点→penglai_checkpoint_sop | 压缩记忆留出处→penglai_compress_sop"
+            " | 生成海报/SVG/视频→penglai_genmedia_sop")
+    out = [lines[0], ident, sops] + lines[1:] if lines and lines[0].startswith("#") else [ident, sops] + lines
     with open(ins, "w", encoding="utf-8") as f:
         f.write("\n".join(out) + "\n")
-    print(f"{OK} 身份已写入 L1 索引（每轮注入）")
+    print(f"{OK} 身份 + 蓬莱SOP索引已写入 L1（每轮注入）")
     return agent
 
 # ---------- 步骤 4：写配置 ----------

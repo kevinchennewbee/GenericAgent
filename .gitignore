@@ -117,6 +117,11 @@ memory/L4_raw_sessions/*
 # Review Mode SOP
 !memory/review_sop.md
 
+# 蓬莱 SOP 包（penglai_ 前缀，与上游 SOP 永不撞名）
+!memory/penglai_checkpoint_sop.md
+!memory/penglai_compress_sop.md
+!memory/penglai_genmedia_sop.md
+
 # Visual Studio
 .vs/
 restore_commit.txt
