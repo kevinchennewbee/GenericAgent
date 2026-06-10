@@ -26,6 +26,17 @@ def _domain(u):
     try: return urlparse(u).netloc.replace("www.", "")
     except Exception: return ""
 
+def _tokens(t):
+    return set(re.findall(r"[\w一-鿿]+", (t or "").lower())) - {"的", "and", "the", "·", "-"}
+
+def _title_sig(t):
+    return "|".join(sorted(_tokens(t)))[:80]
+
+def _title_overlap(a, b):
+    ta, tb = _tokens(a), _tokens(b)
+    if not ta or not tb: return 0.0
+    return len(ta & tb) / min(len(ta), len(tb))
+
 def _bing(query, n=8):
     import requests
     from bs4 import BeautifulSoup
@@ -46,16 +57,16 @@ def _sogou(query, n=8):
     r = requests.get("https://www.sogou.com/web", params={"query": query}, headers=_UA, timeout=10)
     soup = BeautifulSoup(r.text, "html.parser")
     out = []
-    for d in soup.select("div.vrwrap")[:n]:
-        a = d.select_one("h3 a, a.title-hover-show, a")
+    for h in soup.select("div.vrwrap h3, div.rb h3")[:n]:  # 真结果在 h3，跳过提示框
+        a = h.find("a")
         if not a or not a.get("href"): continue
         url = a["href"]
-        if url.startswith("/link?"):  # 搜狗跳转链接
-            url = "https://www.sogou.com" + url
-        sn = d.select_one(".star-wiki, .fz-mid, .text-layout, p")
+        if url.startswith("/link"): url = "https://www.sogou.com" + url
+        wrap = h.find_parent(class_=re.compile("vrwrap|rb"))
+        sn = wrap.select_one(".star-wiki, .fz-mid, .text-layout, .space-txt, p") if wrap else None
         title = _clean(a.get_text())
-        if not title: continue
-        out.append({"title": title, "url": url, "snippet": _clean(sn.get_text() if sn else ""), "source": "搜狗"})
+        if title:
+            out.append({"title": title, "url": url, "snippet": _clean(sn.get_text() if sn else ""), "source": "搜狗"})
     return out
 
 def _tavily(query, n=8):
@@ -85,19 +96,27 @@ def search(query, n=8):
             errors.append(f"{fn.__name__}: {type(e).__name__}")
     if not sources:
         return {"error": "所有搜索源均不可用: " + "; ".join(errors)}
-    # 按域名归并：同域名出现在多个源 → 收敛证据
+    # 归并：优先真实域名，跳转链接(/link)则按标题指纹。收敛=同一条出现在多个源。
     merged = {}
     for res in sources:
         for item in res:
             d = _domain(item["url"])
-            key = d or item["url"]
+            key = d if (d and "sogou.com" not in d and "so.com" not in d) else _title_sig(item["title"])
             if key not in merged:
                 merged[key] = {**item, "seen_in": {item["source"]}}
             else:
                 merged[key]["seen_in"].add(item["source"])
                 if len(item["snippet"]) > len(merged[key]["snippet"]):
                     merged[key]["snippet"] = item["snippet"]
-    items = sorted(merged.values(), key=lambda x: (-len(x["seen_in"]), len(x["title"])))
+                if _domain(merged[key]["url"]) == "" or "/link" in merged[key]["url"]:
+                    if item["url"] and "/link" not in item["url"]: merged[key]["url"] = item["url"]
+    # 跨源标题相似的也判收敛（不同引擎跳转链接不同，靠标题对齐）
+    vals = list(merged.values())
+    for i, a in enumerate(vals):
+        for b in vals[i + 1:]:
+            if a["seen_in"] != b["seen_in"] and _title_overlap(a["title"], b["title"]) >= 0.5:
+                a["seen_in"] = b["seen_in"] = a["seen_in"] | b["seen_in"]
+    items = sorted(vals, key=lambda x: (-len(x["seen_in"]), len(x["title"])))
     return {"query": query, "sources_used": len(sources), "errors": errors,
             "results": [{"title": x["title"], "url": x["url"], "snippet": x["snippet"][:300],
                          "from": "+".join(sorted(x["seen_in"])),
