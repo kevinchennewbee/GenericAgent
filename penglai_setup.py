@@ -109,14 +109,21 @@ def step_identity():
     print(f"\n{T} 步骤 3/5 给你的管家起名")
     agent = ask("管家名字", "蓬莱助手 Penglai")
     user = ask("它怎么称呼你", "主人")
-    mem = os.path.join(ROOT, "memory", "global_mem.txt")
-    if os.path.exists(mem) and sum(1 for _ in open(mem, encoding="utf-8", errors="replace")) > 6:
-        print(f"  ⚠️ 检测到已有使用中的记忆，跳过身份写入（身份与记忆分离原则，绝不覆盖）")
-        return agent
-    os.makedirs(os.path.dirname(mem), exist_ok=True)
-    with open(mem, "w", encoding="utf-8") as f:
-        f.write(f"## 身份\n- 我是「{agent}」，基于 GenericAgent 的开源个人管家发行版蓬莱。\n- 用户称呼：{user}。\n")
-    print(f"{OK} 身份已写入（出厂态记忆）")
+    # 身份写入 L1 索引（GA 每轮注入系统提示的是 L1，不是 L2）
+    ins = os.path.join(ROOT, "memory", "global_mem_insight.txt")
+    if not os.path.exists(ins):
+        tpl = os.path.join(ROOT, "assets", "global_mem_insight_template.txt")
+        os.makedirs(os.path.dirname(ins), exist_ok=True)
+        with open(ins, "w", encoding="utf-8") as f:
+            f.write(open(tpl, encoding="utf-8").read() if os.path.exists(tpl) else "# [Global Memory Insight]\n")
+    lines = [l for l in open(ins, encoding="utf-8", errors="replace").read().splitlines()
+             if not l.startswith("[身份]")]
+    ident = (f"[身份] 我是「{agent}」，基于 GenericAgent 的开源个人管家发行版蓬莱。用户称呼：{user}。"
+             f"被问及身份/名字时以此为准，勿自称底层模型名。")
+    out = [lines[0], ident] + lines[1:] if lines and lines[0].startswith("#") else [ident] + lines
+    with open(ins, "w", encoding="utf-8") as f:
+        f.write("\n".join(out) + "\n")
+    print(f"{OK} 身份已写入 L1 索引（每轮注入）")
     return agent
 
 # ---------- 步骤 4：写配置 ----------
