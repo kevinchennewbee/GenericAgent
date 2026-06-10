@@ -14,7 +14,7 @@
 import os, sys, shutil, subprocess
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
-SERVICES = ["penglai-feishu", "penglai-scheduler"]
+SERVICES = ["penglai-feishu", "penglai-scheduler", "penglai-companion"]
 OK, BAD, WARN = "✅", "❌", "⚠️ "
 
 def sh(cmd, **kw):
@@ -26,6 +26,14 @@ def venv_python():
 
 def has_systemd():
     return shutil.which("systemctl") is not None
+
+def installed_services():
+    """只返回真正装了 unit 文件的服务（companion 是 opt-in，可能没装）。"""
+    out = []
+    for s in SERVICES:
+        if sh(["systemctl", "list-unit-files", f"{s}.service"]).stdout.strip().count(s):
+            out.append(s)
+    return out or SERVICES[:2]
 
 def ensure_upstream():
     r = sh(["git", "remote"], cwd=ROOT)
@@ -86,7 +94,11 @@ def doctor():
 
     # 6. 服务
     if has_systemd():
+        inst = installed_services()
         for s in SERVICES:
+            if s == "penglai-companion" and s not in inst:
+                print(f"{OK} 服务 {s}: 未启用（主动陪伴 opt-in）")
+                continue
             r = sh(["systemctl", "is-active", s])
             state = r.stdout.strip()
             mark = OK if state == "active" else WARN
@@ -113,13 +125,13 @@ def svc(action):
     if not has_systemd():
         print(f"{BAD} 此命令需要 systemd（Linux 服务器）。本机调试请直接运行: python frontends/fsapp.py")
         return 1
-    cmd = ["sudo", "systemctl", action] + SERVICES
+    svcs = installed_services()
     if action == "status":
-        for s in SERVICES:
+        for s in svcs:
             r = sh(["systemctl", "is-active", s])
             print(f"  {s}: {r.stdout.strip()}")
         return 0
-    r = subprocess.run(cmd)
+    r = subprocess.run(["sudo", "systemctl", action] + svcs)
     if r.returncode == 0 and action in ("start", "restart"):
         print(f"{OK} 已{('重' if action == 'restart' else '')}启动。penglai logs 可查看日志")
     return r.returncode
