@@ -9,7 +9,7 @@
   penglai stop      停止服务
   penglai logs      查看最近日志
   penglai update    同步上游 GA（fetch + merge + 提示冒烟清单）
-  penglai setup     安装向导（开发中，暂指向 GA 配置器）
+  penglai setup     安装向导（依赖 → 模型 → 飞书 → 可选微信扫码/情报矩阵/主动陪伴）
 """
 import os, sys, shutil, subprocess
 
