@@ -14,7 +14,8 @@
 import os, sys, shutil, subprocess
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
-SERVICES = ["penglai-feishu", "penglai-scheduler", "penglai-companion"]
+SERVICES = ["penglai-feishu", "penglai-scheduler", "penglai-companion", "penglai-wechat"]
+OPTIN_SERVICES = {"penglai-companion": "主动陪伴", "penglai-wechat": "微信渠道"}  # 未装≠故障
 OK, BAD, WARN = "✅", "❌", "⚠️ "
 
 def sh(cmd, **kw):
@@ -96,8 +97,8 @@ def doctor():
     if has_systemd():
         inst = installed_services()
         for s in SERVICES:
-            if s == "penglai-companion" and s not in inst:
-                print(f"{OK} 服务 {s}: 未启用（主动陪伴 opt-in）")
+            if s in OPTIN_SERVICES and s not in inst:
+                print(f"{OK} 服务 {s}: 未启用（{OPTIN_SERVICES[s]} opt-in）")
                 continue
             r = sh(["systemctl", "is-active", s])
             state = r.stdout.strip()
