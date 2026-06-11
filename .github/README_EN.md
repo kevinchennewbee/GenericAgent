@@ -27,6 +27,33 @@ remembers what you told it, and gets real work done — research, code, schedule
 
 One $5/month VPS, one LLM API key, a ten-minute wizard — and you have your own butler.
 
+## 🌊 Origin: built by someone who can't code
+
+I spent ten years in network security and operations — and **I can't write code. Not a single
+line.** Every line in this repository was "spoken" into existence through AI coding tools.
+Penglai itself is the proof of its own thesis: **in the AI era, ordinary people can build their
+own tools.**
+
+It began with real pain. As an ordinary user determined to embrace this shift, I tried nearly
+every agent tool I could get my hands on — and ran into their walls. I watched the CLI era shine
+(Claude Code, OpenCode, Kimi CLI), then watched the desktop era mature and spread (Codex desktop,
+Qoder, WorkBuddy, Claude Cowork) as agents moved into windows. They are all excellent. And they
+all quietly assume the same thing: **you are sitting at a computer.**
+
+I keep thinking about how personal computing actually unfolded: DOS gave computing to people who
+could type commands; Windows gave it to anyone who could move a mouse; the mobile internet put it
+in everyone's pocket. Agents are walking the same road — **CLI is their DOS, desktop apps are
+their Windows, and the next stop is mobile, inside the fragments of your day.** Every vendor's
+mobile app will have its own brilliance, but for ordinary people, the most convenient, simplest
+tool they genuinely open every day is the chat app. **If you can text, you can use an agent** —
+nothing new to learn.
+
+[GenericAgent](https://github.com/lsdefine/GenericAgent) is the cleanest agent kernel I've seen,
+so Penglai doesn't reinvent it — the core stands squarely on GA's shoulders. What Penglai adds is
+the last mile: run it on any machine you own — a headless VPS, the Mac mini gathering dust in a
+corner, Windows on the way — and let it live in your Feishu and WeChat: on your commute, between
+meetings, always there.
+
 ## ✨ What it does
 
 - 🏮 **Ten-minute setup** — one wizard (`penglai setup`): auto-installs deps (China-mirror aware) → pick a model & test connectivity → **scan-to-create your Feishu bot** (no console clicking; manual credentials as fallback) → name your butler → WeChat QR login
