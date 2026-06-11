@@ -11,15 +11,80 @@ import os, sys, json, time, shutil, subprocess, urllib.request
 ROOT = os.path.dirname(os.path.abspath(__file__))
 OK, BAD, T = "✅", "❌", "🏮"
 
-PRESETS = [  # (名称, apibase, 默认model, 申请地址)
-    ("DeepSeek",        "https://api.deepseek.com",                  "deepseek-chat",          "https://platform.deepseek.com"),
-    ("智谱 GLM",        "https://open.bigmodel.cn/api/paas/v4",      "glm-5.1",                "https://open.bigmodel.cn"),
-    ("MiniMax",         "https://api.minimaxi.com/v1",               "MiniMax-M2.7",           "https://platform.minimaxi.com"),
-    ("Moonshot Kimi",   "https://api.moonshot.cn/v1",                "kimi-k2-turbo-preview",  "https://platform.moonshot.cn"),
-    ("字节火山 Ark",    "https://ark.cn-beijing.volces.com/api/v3",  "",                       "https://console.volcengine.com/ark（model 填推理接入点 ID）"),
-    ("OpenRouter",      "https://openrouter.ai/api/v1",              "anthropic/claude-sonnet-4-6", "https://openrouter.ai"),
-    ("自定义 OpenAI 兼容端点", "", "", ""),
-]
+BANNER = r"""
+  ┌─────────────────────────────────────────────────────┐
+  │                                                     │
+  │    蓬  莱  ·  P  E  N  G  L  A  I                  │
+  │                                                     │
+  │    个人 AI 管家  ·  基于 GenericAgent               │
+  │    飞书 · 微信 · 记忆 · 多渠道                      │
+  │                                                     │
+  └─────────────────────────────────────────────────────┘
+"""
+
+def _load_providers():
+    """加载 penglai_providers.yaml，失败回退到内置最小列表。"""
+    yaml_path = os.path.join(ROOT, "penglai_providers.yaml")
+    if not os.path.exists(yaml_path):
+        return None
+    try:
+        import re
+        with open(yaml_path, encoding="utf-8") as f:
+            raw = f.read()
+        # 极简 YAML 解析（只取 providers 块中需要的字段），标准库无 yaml 模块
+        # 借助 venv 里的 yaml（setup 完成后可用），或降级到内置列表
+        try:
+            import importlib.util
+            venv_py = os.path.join(ROOT, ".venv", "lib")
+            # 尝试找 PyYAML
+            for path in sys.path + ([venv_py] if os.path.isdir(venv_py) else []):
+                if os.path.isdir(path):
+                    for root_, dirs, _ in os.walk(path):
+                        if "yaml" in dirs:
+                            sys.path.insert(0, root_)
+                            break
+            import yaml
+            return yaml.safe_load(raw)
+        except ImportError:
+            return None
+    except Exception:
+        return None
+
+_PROVIDERS_DATA = _load_providers()
+
+def _get_provider_list():
+    """返回 [(序号显示名, provider_id, billing_mode_id, base_url, default_model, signup_url), ...]"""
+    if not _PROVIDERS_DATA:
+        # 内置兜底（数据来自 penglai_providers.yaml，保持同步）
+        return [
+            (1,  "DeepSeek",               "deepseek",   "paygo", "https://api.deepseek.com",                    "deepseek-v4-flash",           "https://platform.deepseek.com"),
+            (2,  "字节火山 Ark (按量)",     "volcengine", "paygo", "https://ark.cn-beijing.volces.com/api/v3",    "doubao-seed-2.0-lite",        "https://console.volcengine.com/ark"),
+            (3,  "字节火山 Ark (Coding)",   "volcengine", "coding_plan", "https://ark.cn-beijing.volces.com/api/coding/v3", "doubao-seed-2.0-code", "https://console.volcengine.com/ark"),
+            (4,  "阿里云百炼 Qwen",         "bailian",    "paygo", "https://dashscope.aliyuncs.com/compatible-mode/v1", "qwen3.7-plus",         "https://bailian.console.aliyun.com"),
+            (5,  "智谱 GLM",               "zhipu",      "paygo", "https://open.bigmodel.cn/api/paas/v4/",       "glm-5.1",                     "https://open.bigmodel.cn"),
+            (6,  "MiniMax",                "minimax",    "paygo", "https://api.minimaxi.com/v1",                 "MiniMax-M3",                  "https://platform.minimaxi.com"),
+            (7,  "Moonshot Kimi",          "moonshot",   "paygo", "https://api.moonshot.cn/v1",                  "kimi-k2.6",                   "https://platform.kimi.com"),
+            (8,  "OpenRouter",             "openrouter", "paygo", "https://openrouter.ai/api/v1",                "anthropic/claude-sonnet-4-6", "https://openrouter.ai"),
+            (9,  "腾讯混元",               "hunyuan",    "paygo", "https://api.hunyuan.cloud.tencent.com/v1",    "hunyuan-turbos-20250416",     "https://cloud.tencent.com/product/hunyuan"),
+            (10, "讯飞星火",               "xunfei",     "paygo", "https://spark-api-open.xf-yun.com/v1",        "max-32k",                     "https://www.xfyun.cn"),
+            (11, "自定义 OpenAI 兼容端点", "custom",     "paygo", "",                                            "",                            ""),
+        ]
+    rows = []
+    idx = 1
+    order = _PROVIDERS_DATA.get("wizard_order", list(_PROVIDERS_DATA.get("providers", {}).keys()))
+    providers = _PROVIDERS_DATA.get("providers", {})
+    for pid in order:
+        p = providers.get(pid)
+        if not p:
+            continue
+        billing = p.get("billing", {})
+        for bid, bdata in billing.items():
+            label = f"{p['display']} ({bdata.get('label', bid)})" if len(billing) > 1 else p["display"]
+            models = bdata.get("models", [])
+            default_model = next((m["id"] for m in models if m.get("default")), models[0]["id"] if models else "")
+            rows.append((idx, label, pid, bid, bdata.get("base_url", ""), default_model, p.get("signup_url", "")))
+            idx += 1
+    return rows
 
 def ask(prompt, default=""):
     tip = f"（回车={default}）" if default else ""
@@ -61,13 +126,51 @@ def step_env():
 # ---------- 步骤 1：LLM ----------
 def step_llm():
     print(f"\n{T} 步骤 1/5 选择大模型（蓬莱的大脑）")
-    for i, (name, _, model, url) in enumerate(PRESETS, 1):
-        print(f"  {i}. {name:<22}{model:<28}{url}")
+    rows = _get_provider_list()
+    for row in rows:
+        if len(row) == 7:
+            idx, label, pid, bid, base, model, signup = row
+        else:
+            idx, label, pid, bid, base, model, signup = row[0], row[1], row[2], row[3], row[4], row[5], row[6]
+        model_hint = f"  默认: {model}" if model else "  （手动填模型名）"
+        signup_hint = f"  {signup}" if signup else ""
+        print(f"  {idx:>2}. {label:<36}{model_hint:<32}{signup_hint}")
+    print()
+
+    # 弃用模型警告表（来自 providers yaml）
+    deprecated_map = {}
+    if _PROVIDERS_DATA:
+        for p in _PROVIDERS_DATA.get("providers", {}).values():
+            for d in p.get("deprecated", []):
+                deprecated_map[d["id"]] = d.get("replace", "")
+
     while True:
-        try: idx = int(ask("选择序号", "1")) - 1; name, base, model, _ = PRESETS[idx]; break
-        except (ValueError, IndexError): print("  无效序号，请重选")
-    if not base: base = ask("API Base URL（如 https://api.example.com/v1）")
-    model = ask("模型名", model) if model else ask("模型名（Ark 填推理接入点 ID）")
+        try:
+            chosen = int(ask("选择序号", "1")) - 1
+            row = rows[chosen]
+            if len(row) == 7:
+                _, name, pid, bid, base, default_model, signup = row
+            break
+        except (ValueError, IndexError):
+            print("  无效序号，请重选")
+
+    # plan 警告
+    if _PROVIDERS_DATA and pid in _PROVIDERS_DATA.get("providers", {}):
+        bdata = _PROVIDERS_DATA["providers"][pid].get("billing", {}).get(bid, {})
+        if bdata.get("warning"):
+            print(f"  ⚠️  {bdata['warning']}")
+
+    if not base:
+        base = ask("API Base URL（如 https://api.example.com/v1）")
+    model = ask("模型名", default_model)
+
+    # 弃用提示
+    if model in deprecated_map:
+        replace = deprecated_map[model]
+        print(f"  ⚠️  {model} 即将废弃，建议改用 {replace}")
+        if ask(f"改用 {replace}？(y/n)", "y").lower().startswith("y"):
+            model = replace
+
     key = ask("API Key（粘贴后回车）")
     print("  连通性测试中...", end="", flush=True)
     try:
@@ -326,7 +429,7 @@ def step_launch(with_companion=False, with_wechat=False):
         print(f"  前台运行命令: .venv/bin/python {os.path.join(ROOT, 'frontends/fsapp.py')}")
 
 def main():
-    print(f"{T} 欢迎使用蓬莱 Penglai — 基于 GenericAgent 的个人管家发行版")
+    print(BANNER)
     step_env()
     llm = step_llm()
     app_id, app_secret = step_feishu()
