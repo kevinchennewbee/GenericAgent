@@ -1,4 +1,4 @@
-import base64, requests, sys, os
+import base64, re, requests, sys, os
 from io import BytesIO
 from pathlib import Path
 
@@ -96,7 +96,7 @@ def _call_claude(b64, prompt, timeout, max_tokens=1024):
 def _call_openai_compat(b64, prompt, timeout, *, apibase, apikey, model, proxy=None):
     proxies = {'https': proxy, 'http': proxy} if proxy else None
     resp = requests.post(
-        apibase.rstrip('/') + '/v1/chat/completions',
+        apibase.rstrip('/') + ('/chat/completions' if re.search(r'/v\d+$', apibase.rstrip('/')) else '/v1/chat/completions'),
         json={'model': model, 'messages': [{
             'role': 'user',
             'content': [
