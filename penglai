@@ -28,6 +28,47 @@ def venv_python():
 def has_systemd():
     return shutil.which("systemctl") is not None
 
+# ---------- 无 systemd 环境（容器/macOS）的进程管理 ----------
+FSLOG = os.path.join(ROOT, "temp", "fsapp.log")
+
+def fsapp_pids():
+    r = sh(["pgrep", "-f", "frontends/fsapp.py"])
+    return [int(x) for x in r.stdout.split()] if r.returncode == 0 else []
+
+def fsapp_start():
+    import time
+    if pids := fsapp_pids():
+        print(f"{OK} 飞书进程已在运行（PID {pids[0]}）"); return 0
+    os.makedirs(os.path.join(ROOT, "temp"), exist_ok=True)
+    lf = open(FSLOG, "ab")
+    p = subprocess.Popen([venv_python(), os.path.join(ROOT, "frontends", "fsapp.py")], cwd=ROOT,
+                         stdout=lf, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
+                         start_new_session=True)
+    deadline = time.monotonic() + 45
+    while time.monotonic() < deadline:
+        if p.poll() is not None:
+            print(f"{BAD} 进程退出（码 {p.returncode}），最近日志：")
+            for l in open(FSLOG, encoding="utf-8", errors="replace").read().splitlines()[-8:]:
+                print("  " + l[:160])
+            return 1
+        with open(FSLOG, encoding="utf-8", errors="replace") as f:
+            if "connected to wss" in f.read():
+                print(f"{OK} 飞书进程已启动且长连接已建立（PID {p.pid}，日志: ./penglai logs）")
+                return 0
+        time.sleep(2)
+    print(f"{WARN}进程在跑（PID {p.pid}）但 45 秒未见连接成功，./penglai logs 查看")
+    return 1
+
+def fsapp_stop():
+    import signal
+    pids = fsapp_pids()
+    if not pids:
+        print(f"{OK} 飞书进程未在运行"); return 0
+    for pid in pids:
+        try: os.kill(pid, signal.SIGTERM)
+        except ProcessLookupError: pass
+    print(f"{OK} 已停止（PID {' '.join(map(str, pids))}）"); return 0
+
 def installed_services():
     """只返回真正装了 unit 文件的服务（companion 是 opt-in，可能没装）。"""
     out = []
@@ -108,7 +149,7 @@ def doctor():
     srcs = (r.stdout or "").strip()
     print(f"{OK} 情报矩阵：{'已启用 ' + srcs if srcs else '默认（GA 浏览器，未配 API key）'}")
 
-    # 6. 服务
+    # 6. 服务/进程（飞书没在跑 = 机器人收不到消息，必须红）
     if has_systemd():
         inst = installed_services()
         for s in SERVICES:
@@ -117,10 +158,14 @@ def doctor():
                 continue
             r = sh(["systemctl", "is-active", s])
             state = r.stdout.strip()
-            mark = OK if state == "active" else WARN
-            print(f"{mark} 服务 {s}: {state or '未安装'}")
+            if s == "penglai-feishu":
+                check(f"服务 {s}: {state or '未安装'}", state == "active", "sudo systemctl restart penglai-feishu")
+            else:
+                print(f"{OK if state == 'active' else WARN} 服务 {s}: {state or '未安装'}")
     else:
-        print(f"{WARN} 非 systemd 环境（macOS/容器），跳过服务检查")
+        pids = fsapp_pids()
+        check(f"飞书进程（非 systemd 环境，nohup 模式{'，PID ' + str(pids[0]) if pids else ''}）",
+              bool(pids), "运行: ./penglai start")
 
     # 7. 上游同步状态
     ensure_upstream()
@@ -139,8 +184,14 @@ def doctor():
 # ---------- services ----------
 def svc(action):
     if not has_systemd():
-        print(f"{BAD} 此命令需要 systemd（Linux 服务器）。本机调试请直接运行: python frontends/fsapp.py")
-        return 1
+        # 容器/macOS：直接管理 nohup 飞书进程
+        if action == "status":
+            pids = fsapp_pids()
+            print(f"  penglai-feishu: {'running (PID ' + str(pids[0]) + ')' if pids else 'stopped'}")
+            return 0
+        if action == "start":   return fsapp_start()
+        if action == "stop":    return fsapp_stop()
+        if action == "restart": fsapp_stop(); return fsapp_start()
     svcs = installed_services()
     if action == "status":
         for s in svcs:
@@ -154,7 +205,11 @@ def svc(action):
 
 def logs():
     if not has_systemd():
-        print(f"{BAD} 此命令需要 systemd。"); return 1
+        if not os.path.exists(FSLOG):
+            print(f"{WARN}暂无日志（{FSLOG}）。先 ./penglai start"); return 1
+        for l in open(FSLOG, encoding="utf-8", errors="replace").read().splitlines()[-30:]:
+            print(l)
+        return 0
     return subprocess.run(["journalctl", "-u", SERVICES[0], "-n", "30", "--no-pager"]).returncode
 
 # ---------- update ----------
