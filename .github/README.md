@@ -139,9 +139,10 @@ penglai update     # 一键同步上游内核
 
 ## 📜 许可与品牌
 
-- **代码**：[MIT](../LICENSE) 许可。上游 GenericAgent 的版权声明完整保留；蓬莱层代码 © 2026 Kevin Chen，同样以 MIT 发布——随便用、随便改、随便商用。
+- **代码**：[MIT](../LICENSE) 许可。上游 GenericAgent 的版权声明完整保留；蓬莱层代码 © 2026 Kevin Chen，同样以 MIT 发布——随便用、随便改、随便商用。详见根目录 [NOTICE](../NOTICE)。
 - **品牌**：「蓬莱」「Penglai」名称、logo 与横幅视觉资产**保留所有权利**，不在代码许可范围内。未经书面许可，请勿将其用于你的分发版本、衍生产品或商业宣传的命名与标识。
   （开源圈通行做法：代码自由，品牌保留——Rust、Docker 皆如此。）
+- **本页是唯一入口**：仓库根目录的 `README.md`、`docs/*`、`assets/*` 是上游 GenericAgent 内核的**原文档（零改动保留）**，介绍的是内核本身；蓬莱的安装只看本页与 `install.sh` / `docker-install.sh`（均指向 `kevinchennewbee/PenglaiAgent`）。根 README 里的安装命令、社区群二维码等属于上游项目，不是蓬莱的入口。
 
 ## 🙏 致谢
 

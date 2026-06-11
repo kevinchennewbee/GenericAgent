@@ -147,9 +147,10 @@ what Ubuntu is to the Linux kernel:
 
 ## 📜 License & Brand
 
-- **Code**: [MIT](../LICENSE). Upstream GenericAgent's copyright notice is preserved in full; the Penglai layer is © 2026 Kevin Chen, also released under MIT — use it, change it, sell it.
+- **Code**: [MIT](../LICENSE). Upstream GenericAgent's copyright notice is preserved in full; the Penglai layer is © 2026 Kevin Chen, also released under MIT — use it, change it, sell it. See the root [NOTICE](../NOTICE) for the boundary.
 - **Brand**: the "蓬莱" / "Penglai" name, logo, and banner artwork are **all rights reserved** and not covered by the code license. Please don't use them to name or market your forks, derivatives, or commercial offerings without written permission.
   (The common open-source convention: free code, reserved brand — as practiced by Rust, Docker, and others.)
+- **This page is the only entry point**: the repo's root `README.md`, `docs/*`, and `assets/*` are the **upstream GenericAgent kernel's own docs, kept at zero diff** — they describe the kernel itself. Penglai's install path is only this page plus `install.sh` / `docker-install.sh` (both pointing at `kevinchennewbee/PenglaiAgent`). The install commands and community-group QR codes in the root README belong to the upstream project, not to Penglai.
 
 ## 🙏 Acknowledgments
 

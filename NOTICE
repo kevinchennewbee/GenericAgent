@@ -1,0 +1,53 @@
+蓬莱 · Penglai
+================
+
+Penglai (蓬莱) is a downstream *distribution* of GenericAgent — the GA kernel is
+kept at zero diff and all Penglai capabilities are mounted as additive files /
+runtime plugins (like Ubuntu to the Linux kernel). This NOTICE records the
+copyright and brand boundaries that the single root LICENSE (upstream MIT) does
+not, by itself, make obvious to license scanners or downstream users.
+
+
+Code license
+------------
+
+All code is MIT licensed (see ./LICENSE).
+
+  * Upstream kernel — GenericAgent
+    Copyright (c) 2025 lsdefine
+    https://github.com/lsdefine/GenericAgent
+    The upstream MIT copyright notice in ./LICENSE is retained in full.
+
+  * Penglai distribution layer
+    Copyright (c) 2026 Kevin Chen (kevinchennewbee)
+    Released under the same MIT terms.
+    The Penglai layer is the set of additive files that do NOT exist upstream,
+    e.g.: penglai, penglai_setup.py, penglai_providers.yaml,
+    plugins/penglai_*.py, reflect/penglai_companion.py, memory/penglai_*_sop.md,
+    install.sh, docker-install.sh, docker-entrypoint.sh, Dockerfile,
+    docker-compose.yml, installer/*, .github/README*.md, .github/workflows/*.
+
+
+Upstream files are kept verbatim
+--------------------------------
+
+The repository root README.md, docs/*, LICENSE, CONTRIBUTING.md, the root
+pyproject.toml, assets/* (including demo media and community QR codes), and the
+core sources (ga.py, agent_loop.py, agentmain.py, llmcore.py, frontends/*,
+memory/*) are upstream GenericAgent files kept at deliberate zero diff so that
+upstream updates merge cleanly. They describe and identify the upstream kernel.
+
+The repository's rendered front page is .github/README.md (GitHub README
+precedence: .github/ > root), which is the Penglai-branded entry point. Penglai's
+only install entry points are install.sh / docker-install.sh / the PyPI
+bootstrap (installer/), all pointing at kevinchennewbee/PenglaiAgent.
+
+
+Brand
+-----
+
+The names "蓬莱" / "Penglai", the logo, and the banner / visual assets are NOT
+covered by the MIT code license and all rights to them are reserved. Please do
+not use them to name or brand your own distribution, derivative, or commercial
+product without written permission. (Code free, brand reserved — the same
+convention used by Rust and Docker.)
