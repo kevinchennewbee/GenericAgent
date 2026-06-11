@@ -29,8 +29,8 @@ One $5/month VPS, one LLM API key, a ten-minute wizard — and you have your own
 
 ## 🌊 Origin: built by someone who can't code
 
-I spent ten years in network security and operations — and **I can't write code. Not a single
-line.** Every line in this repository was "spoken" into existence through AI coding tools.
+I spent ten years in network engineering, security, and operations — and **I can't write code.
+Not a single line.** Every line in this repository was "spoken" into existence through AI coding tools.
 Penglai itself is the proof of its own thesis: **in the AI era, ordinary people can build their
 own tools.**
 
