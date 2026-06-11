@@ -415,7 +415,7 @@ if __name__ == '__main__':
     print(f'[NEW] Process starting {time.strftime("%m-%d %H:%M")}')
     bot = WxBotClient()
     if _do_relogin or not bot.token:
-        if not sys.stdout.isatty():
+        if not (sys.__stdout__ and sys.__stdout__.isatty()):
             print('[Bot] no token and not interactive, exit.'); sys.exit(1)
         sys.stdout = sys.stderr = sys.__stdout__  # restore for QR display
         bot.login_qr()
