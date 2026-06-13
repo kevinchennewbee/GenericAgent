@@ -131,11 +131,17 @@ def enable_companion():
                             or pc.sh(["systemctl", "is-active", "penglai-companion"]).stdout.strip() == "active"):
         print(f"{OK} 主动陪伴已在运行。"); return 0
     print("  💞 开启主动陪伴：独立心跳进程，门禁守护（默认勿扰 22-8 点、最短间隔 4 小时），")
-    print("     偶尔主动联系你。是蓬莱第一个有持续 token 成本的功能（一天约几分钱）。")
+    print("     触发源：恶劣天气预警 / 语音情绪承接 / 早晚问候 / 久未联系。投递到飞书和微信。")
+    print("     是蓬莱第一个有持续 token 成本的功能（一天约几分钱）。")
     if not _ask("现在开启？(y/n)", "y").lower().startswith("y"):
         return 0
-    pc.mykey_set({"companion_enabled": True})
-    print(f"{OK} 已写入 companion_enabled=True（可后续在 mykey.py 调勿扰时段/间隔）")
+    keys = {"companion_enabled": True}
+    city = _ask("所在城市（开启恶劣天气主动提醒，回车跳过）", "").strip()
+    if city:
+        keys["companion_city"] = city
+    pc.mykey_set(keys)
+    extra = f"、companion_city={city}（天气预警开）" if city else "（未设城市，天气预警关）"
+    print(f"{OK} 已写入 companion_enabled=True{extra}")
     return 0 if _install_reflect_service("penglai-companion", "reflect/penglai_companion.py", "主动陪伴") else 1
 
 

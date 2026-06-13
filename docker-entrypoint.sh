@@ -35,15 +35,19 @@ fi
 FS_OK=$(python -c "import sys; sys.path.insert(0,'/app'); import mykey; print(1 if getattr(mykey,'fs_app_id','') and getattr(mykey,'fs_app_secret','') else 0)" 2>/dev/null || echo 0)
 WX_OK=0
 [ -s "$D/wxbot/token.json" ] && WX_OK=1
+CP_OK=$(python -c "import sys; sys.path.insert(0,'/app'); import mykey; print(1 if getattr(mykey,'companion_enabled',False) else 0)" 2>/dev/null || echo 0)
 
 python /app/agentmain.py --reflect /app/reflect/scheduler.py &
+# 主动陪伴开了就拉起(此前 Docker 形态漏拉=死开关)
+[ "$CP_OK" = "1" ] && python /app/agentmain.py --reflect /app/reflect/penglai_companion.py &
 
+# 微信走 penglai_im_launch 包装器:记录主人 uid 供主动陪伴投递,行为与直跑 wechatapp 一致
 if [ "$FS_OK" = "1" ]; then
-    [ "$WX_OK" = "1" ] && python /app/frontends/wechatapp.py &
+    [ "$WX_OK" = "1" ] && python /app/penglai_im_launch.py wechat &
     exec python /app/frontends/fsapp.py
 elif [ "$WX_OK" = "1" ]; then
     echo "ℹ️ 未配置飞书,以微信为主渠道启动"
-    exec python /app/frontends/wechatapp.py
+    exec python /app/penglai_im_launch.py wechat
 else
     echo "⚠️ 未检测到任何已配置的 IM 渠道(飞书凭证未填、微信未绑定)。"
     echo "   补配渠道: docker exec -it penglai /app/docker-entrypoint.sh setup"

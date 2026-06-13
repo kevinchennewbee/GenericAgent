@@ -816,7 +816,8 @@ def step_launch(with_feishu=True, with_companion=False, with_wechat=False):
         if with_companion:
             units["penglai-companion"] = f"python {ROOT}/agentmain.py --reflect {ROOT}/reflect/penglai_companion.py"
         if with_wechat:
-            units["penglai-wechat"] = f"python {ROOT}/frontends/wechatapp.py"
+            # 走包装器：记录主人 uid（主动陪伴微信投递需要），行为与直跑 wechatapp 一致
+            units["penglai-wechat"] = f"python {ROOT}/penglai_im_launch.py wechat"
         t0 = int(time.time())
         try:
             for name, cmd in units.items():
