@@ -125,8 +125,20 @@ penglai logs       # 最近日志（penglai logs dingtalk 看指定渠道）
 penglai channels   # IM 渠道矩阵总览
 penglai abilities  # 能力总览（语音/陪伴/情报，未开的直接给开启命令）
 penglai enable voice|companion|intel   # 事后补开向导没开的能力
-penglai update     # 一键升级到最新版蓬莱（从发行仓拉取，已含合并后的内核）
+penglai update     # 安全升级：预检 → 后台重启 → 健康检查 → 失败自动回滚（结果发到你 IM）
 ```
+
+> 💡 **升级很省心**：`penglai update` 确认后全自动——先编译+安全插件预检拦住坏更新，再由脱离进程的后台监工重启并做连接健康检查，**新版起不来会自动回滚到上一个能跑的版本**，全程结果发到你飞书/微信，不用 SSH 上服务器。你也可以让管家在 IM 里直接说「检查更新 / 升级」。
+
+> 🐳 **Docker 党的日常运维**（容器里没有 systemd，命令略不同）：
+> ```bash
+> docker logs -f penglai                      # 看日志（出现「收到消息」即收发全通）
+> docker exec -it penglai penglai doctor      # 体检（任意 penglai 子命令都可这样跑）
+> docker restart penglai                      # 重启容器
+> # 升级 = 拉新镜像（不是 git）：重跑下面这行，数据在 penglai-data 卷里不丢
+> curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/kevinchennewbee/PenglaiAgent/main/docker-install.sh | sh
+> ```
+> 容器内置常驻监工：扫码绑定、`penglai setup` 补配新渠道后**无需重启容器**，30 秒内自动拉起；进程崩溃自愈。
 
 > 🇨🇳 国内服务器友好：依赖走清华 PyPI 镜像，模型与代码走 gh-proxy，向导自动处理，无需手动配置。
 
