@@ -239,6 +239,7 @@ Penglai is a downstream distribution of [GenericAgent](https://github.com/lsdefi
 
 Full version timeline on the [website changelog](https://penglai.pages.dev/#changelog).
 
+- **2026-06-13** — v0.2.1: safe `penglai update` — preflight blocks broken updates + background supervisor restart + health check + **auto-rollback if the new version won't start** + result messaged to your IM; the butler can "check for updates / upgrade" right in chat
 - **2026-06-13** — v0.2.0: keyless web search out of the box (Bing fallback, headless-ok) + Proactive Companion v2 (weather alerts / voice emotion / check-ins, dual Feishu+WeChat delivery) + critic review model picked from the full catalog + Docker resident supervisor (auto-starts channels after scan/config)
 - **2026-06-12** — IM voice wrapper (DingTalk/QQ/WeCom — filling the upstream gap) + on-demand abilities `penglai enable / abilities` + website redesign + new banner
 - **2026-06-12** — Wizard v2: language-first / paged terminal / one-page channel picker / ability panel / voice by default
