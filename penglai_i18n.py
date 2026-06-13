@@ -172,7 +172,7 @@ EN = {
 
     # ---- 启动验证 ----
     "启动并验证": "Launch & verify",
-    "容器模式：配置完成，启动与连接验证由 Docker 部署脚本接管": "Container mode: config done; launch & verification handled by the Docker deploy script",
+    "容器模式：配置完成。容器守护每 30 秒巡检，新配置的渠道自动拉起（无需重启容器）": "Container mode: config done. The container supervisor re-scans every 30s and auto-starts newly configured channels (no restart needed)",
     "安装为系统服务（开机自启）？(y/n)": "Install as system services (start on boot)? (y/n)",
     "服务已安装并设为开机自启，开始验证...": "Services installed and enabled, verifying...",
     "服务安装失败（sudo 权限？），可手动前台运行: .venv/bin/python frontends/fsapp.py": "Service install failed (sudo?). Run manually: .venv/bin/python frontends/fsapp.py",
@@ -201,7 +201,7 @@ EN = {
 
     # ---- 总结 ----
     "🎉 安装完成，飞书收发链路已实测全通！": "🎉 Setup complete — the Feishu loop is live-verified!",
-    "配置完成。容器服务即将由部署脚本启动并验证连接。": "Config done. The container will be started and verified by the deploy script.",
+    "配置完成。容器守护将在 30 秒内拉起已配置的渠道并可在日志取证（docker logs -f penglai）。": "Config done. The container supervisor will start configured channels within 30s; verify via docker logs -f penglai.",
     "安装完成（链路未实测）。去飞书给「{a}」发一句「你好」，用 penglai logs 看到「收到消息」即全通。": "Setup complete (loop not live-verified). Message \"{a}\" on Feishu and check `penglai logs` for an incoming message.",
     "配置已写入，但飞书链路验证未通过 —— 按上方提示排查后运行 penglai doctor 复检。": "Config written, but Feishu verification failed — follow the hints above, then run `penglai doctor`.",
     "安装完成。已配置渠道见上；终端随时可聊。": "Setup complete. Channels as configured above; the terminal TUI is always available.",

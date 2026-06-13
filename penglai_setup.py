@@ -800,7 +800,7 @@ def _verify_live(read_log, log_hint):
 def step_launch(with_feishu=True, with_companion=False, with_wechat=False):
     header(T("步骤") + f" 6/{_TOTAL_STEPS}", T("启动并验证"))
     if os.environ.get("PENGLAI_DOCKER"):
-        print(f"{OK} " + T("容器模式：配置完成，启动与连接验证由 Docker 部署脚本接管"))
+        print(f"{OK} " + T("容器模式：配置完成。容器守护每 30 秒巡检，新配置的渠道自动拉起（无需重启容器）"))
         return "docker"
     py = os.path.join(ROOT, ".venv", "bin", "python")
     if not with_feishu:
@@ -921,7 +921,7 @@ def main():
     if live is True:
         print("\n" + T("🎉 安装完成，飞书收发链路已实测全通！"))
     elif live == "docker":
-        print(f"\n{OK} " + T("配置完成。容器服务即将由部署脚本启动并验证连接。"))
+        print(f"\n{OK} " + T("配置完成。容器守护将在 30 秒内拉起已配置的渠道并可在日志取证（docker logs -f penglai）。"))
         return
     elif live == "skip":
         print(f"\n{OK} " + T("安装完成（链路未实测）。去飞书给「{a}」发一句「你好」，用 penglai logs 看到「收到消息」即全通。", a=agent))
